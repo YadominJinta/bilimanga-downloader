@@ -86,11 +86,6 @@ func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string) erro
 	}
 	// Mkdir episode dir
 	BasePath := fmt.Sprintf("./%s/%s", mangaInfo.Title, epInfo.ShortTitle)
-	if _, err = os.Stat(BasePath); os.IsNotExist(err) {
-		if err = os.Mkdir(BasePath, 0755); err != nil {
-			return err
-		}
-	}
 	// Download images
 	wg := sync.WaitGroup{}
 	for i, v := range imageTokens.Data {
@@ -190,6 +185,20 @@ func main() {
 
 	for _, ep := range mangaInfo.EpList {
 		if !ep.IsLocked || ep.IsInFree {
+			BasePath := fmt.Sprintf("./%s/%s", mangaInfo.Title, ep.ShortTitle)
+			if st, err := os.Stat(BasePath); os.IsNotExist(err) {
+				if err = os.Mkdir(BasePath, 0755); err != nil {
+					checkErr(err)
+				}
+			} else if !st.IsDir() {
+				err = os.Remove(BasePath)
+				checkErr(err)
+				err = os.Mkdir(BasePath, 0755)
+				checkErr(err)
+			} else {
+				log.Printf("%s: %s has been downloaded, skip", ep.ShortTitle, ep.Title)
+				continue
+			}
 			log.Printf("Started to download %s: %s", ep.ShortTitle, ep.Title)
 			_ = DownloadEpisode(mangaInfo, &ep, Cookie)
 			continue
