@@ -22,6 +22,7 @@ type EpInfo struct {
 	IsInFree   bool   `json:"is_in_free"`
 	IsLocked   bool   `json:"is_locked"`
 	ID         int64  `json:"id"`
+	Order      int64  `json:"ord"`
 }
 
 type MangaDetail struct {

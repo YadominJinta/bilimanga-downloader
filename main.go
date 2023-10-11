@@ -7,7 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -25,7 +25,7 @@ func DownloadPic(filename, url, cookie string) error {
 	return os.WriteFile(filename, resp, 0644)
 }
 
-func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string) error {
+func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string, episodePath string) error {
 	const EpisodeIndexURL = BiliMangaBaseURL + "/twirp/comic.v1.Comic/GetImageIndex?device=pc&platform=web"
 	const ImageTokenURL = BiliMangaBaseURL + "/twirp/comic.v1.Comic/ImageToken?device=pc&platform=web"
 	// Get episode's image index
@@ -57,7 +57,7 @@ func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string) erro
 	if err != nil {
 		return err
 	}
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -75,6 +75,7 @@ func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string) erro
 	}{
 		Urls: string(urls),
 	})
+	checkErr(err)
 	resp, err = DoRequest(http.MethodPost, ImageTokenURL, string(s), cookie, JsonContent)
 	if err != nil {
 		return err
@@ -84,15 +85,13 @@ func DownloadEpisode(mangaInfo *MangaDetail, epInfo *EpInfo, cookie string) erro
 	if err != nil {
 		return err
 	}
-	// Mkdir episode dir
-	BasePath := fmt.Sprintf("./%s/%s", mangaInfo.Title, epInfo.ShortTitle)
 	// Download images
 	wg := sync.WaitGroup{}
 	for i, v := range imageTokens.Data {
 		wg.Add(1)
 		go func(i int, v ImageToken) {
 			defer wg.Done()
-			err := DownloadPic(fmt.Sprintf("%s/%d.jpg", BasePath, i+1),
+			err := DownloadPic(fmt.Sprintf("%s/%d.jpg", episodePath, i+1),
 				fmt.Sprintf("%s?token=%s", v.URL, v.Token), cookie)
 			if err != nil {
 				log.Println(err)
@@ -155,17 +154,34 @@ func GetMangaID(mangaURL string) (int64, error) {
 
 func main() {
 	var (
-		Cookie   = ""
-		MangaURL = ""
+		Cookie     = ""
+		CookieFile = ""
+		MangaURL   = ""
 	)
 
 	flag.StringVar(&Cookie, "cookie", "", "your cookie on bilibili manga")
+	flag.StringVar(&CookieFile, "cookie-file", "", "your cookie file")
 	flag.StringVar(&MangaURL, "url", "", "manga url to download")
 	flag.Parse()
 
-	if len(Cookie) == 0 || len(MangaURL) == 0 {
+	if len(Cookie) == 0 && len(CookieFile) == 0 {
+		println("You must set one of cookie or cookie-file")
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if len(MangaURL) == 0 {
+		println("You must set manga url")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if len(Cookie) == 0 {
+		cookieFile, err := os.Open(CookieFile)
+		checkErr(err)
+		cookieContent, err := io.ReadAll(cookieFile)
+		checkErr(err)
+		Cookie = string(cookieContent)
 	}
 
 	mangaID, err := GetMangaID(MangaURL)
@@ -185,7 +201,7 @@ func main() {
 
 	for _, ep := range mangaInfo.EpList {
 		if !ep.IsLocked || ep.IsInFree {
-			BasePath := fmt.Sprintf("./%s/%s", mangaInfo.Title, ep.ShortTitle)
+			BasePath := fmt.Sprintf("./%s/%d. %s %s", mangaInfo.Title, ep.Order, ep.ShortTitle, ep.Title)
 			if st, err := os.Stat(BasePath); os.IsNotExist(err) {
 				if err = os.Mkdir(BasePath, 0755); err != nil {
 					checkErr(err)
@@ -200,7 +216,7 @@ func main() {
 				continue
 			}
 			log.Printf("Started to download %s: %s", ep.ShortTitle, ep.Title)
-			_ = DownloadEpisode(mangaInfo, &ep, Cookie)
+			_ = DownloadEpisode(mangaInfo, &ep, Cookie, BasePath)
 			continue
 		}
 		log.Printf("%s: %s is locked", ep.ShortTitle, ep.Title)
