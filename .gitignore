@@ -2,3 +2,7 @@ output
 .idea
 .vscode
 cookie.txt
+
+# Added by cargo
+
+/target
