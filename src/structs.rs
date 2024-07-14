@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResponseData {
@@ -6,7 +6,7 @@ pub enum ResponseData {
     EpInfo(EpInfo),
     BiliUserInfo(BiliUserInfo),
     EpisodeDetail(EpisodeDetail),
-    ImageToken(Vec<ImageToken>)
+    ImageToken(Vec<ImageToken>),
 }
 
 impl From<MangaDetail> for ResponseData {
@@ -40,7 +40,7 @@ impl From<Vec<ImageToken>> for ResponseData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BaseResponse<T: Into<ResponseData>>{
+pub struct BaseResponse<T: Into<ResponseData>> {
     pub code: i64,
     pub message: Option<String>,
     pub msg: Option<String>,
@@ -51,7 +51,7 @@ pub struct BaseResponse<T: Into<ResponseData>>{
 pub struct MangaDetail {
     pub id: i64,
     pub title: String,
-    pub ep_list: Vec<EpInfo>
+    pub ep_list: Vec<EpInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,7 +61,7 @@ pub struct EpInfo {
     pub short_title: String,
     pub is_in_free: bool,
     pub is_locked: bool,
-    pub ord: i64
+    pub ord: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +73,16 @@ pub struct BiliUserInfo {
 pub struct EpisodeDetail {
     pub path: String,
     pub host: String,
+    pub images: Vec<ImageDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageDetail {
+    pub path: String,
+    pub x: i64,
+    pub y: i64,
+    video_path: String,
+    video_size: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

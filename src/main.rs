@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use futures::future::{join_all, try_join_all};
+use indicatif::ProgressBar;
 use log::{error, info};
 use requests::{BiliMangaClient, BiliMangaError};
 use structs::{EpInfo, MangaDetail};
@@ -39,14 +40,15 @@ async fn download_episode(
     std::fs::create_dir(base_path.clone()).map_err(BiliMangaError::IoError)?;
 
     let episode_index = manga_client.get_episode_index(episode.id).await?;
-    let decoded_index = manga_client
-        .get_decoded_index(
-            format!("{}{}", episode_index.host, episode_index.path),
-            episode.id,
-            manga_detail.id,
-        )
-        .await?;
-    let full_urls = manga_client.get_image_token(decoded_index.pics).await?;
+    // let decoded_index = manga_client
+    //     .get_decoded_index(
+    //         format!("{}{}", episode_index.host, episode_index.path),
+    //         episode.id,
+    //         manga_detail.id,
+    //     )
+    //     .await?;
+    let urls: Vec<String> = episode_index.images.into_iter().map(|i| i.path).collect();
+    let full_urls = manga_client.get_image_token(urls).await?;
     let tasks = full_urls.into_iter().enumerate().map(|(idx, image_token)| {
         let url = format!("{}?token={}", image_token.url, image_token.token);
         let client = manga_client.clone();
@@ -73,11 +75,13 @@ async fn download_manga(args: Args) -> Result<(), BiliMangaError> {
     let manga_id = BiliMangaClient::get_manga_id(args.url)?;
     let manga_detail = manga_client.get_manga_detail(manga_id).await?;
     info!("开始下载漫画: {}", manga_detail.title);
+    let progress_bar = ProgressBar::new(manga_detail.ep_list.len() as u64);
     if !std::fs::exists(manga_detail.title.clone()).map_err(BiliMangaError::IoError)? {
         std::fs::create_dir(manga_detail.title.clone()).map_err(BiliMangaError::IoError)?;
     }
     for episode in manga_detail.clone().ep_list {
         download_episode(manga_detail.clone(), episode, manga_client.clone()).await?;
+        progress_bar.inc(1);
     }
     Ok(())
 }
@@ -89,7 +93,7 @@ async fn main() -> Result<(), BiliMangaError> {
     let args = Args::parse();
 
     match download_manga(args).await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             error!("{:?}", e);
             panic!("can't download manga");

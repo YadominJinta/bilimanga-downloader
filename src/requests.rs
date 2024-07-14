@@ -19,7 +19,6 @@ use crate::structs::{
 
 const BILI_API_BASE_URL: &str = "https://api.bilibili.com";
 const BILI_MANGA_BASE_URL: &str = "https://manga.bilibili.com";
-const BILI_MANGA_SLB_URL: &str = "https://i0.hdslb.com";
 const BILI_MANGA_DETAIL_URL: &str = concatcp!(
     BILI_MANGA_BASE_URL,
     "/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web"
@@ -215,9 +214,13 @@ impl BiliMangaClient {
             .send()
             .await
             .map_err(BiliMangaError::RequestError)?;
-        let text = response.text().await.map_err(BiliMangaError::RequestError)?;
+        let text = response
+            .text()
+            .await
+            .map_err(BiliMangaError::RequestError)?;
         debug!("{}", text);
-        let response: BaseResponse<Vec<ImageToken>> = serde_json::from_str(&text).map_err(BiliMangaError::ParseJsonError)?;
+        let response: BaseResponse<Vec<ImageToken>> =
+            serde_json::from_str(&text).map_err(BiliMangaError::ParseJsonError)?;
         if response.code != 0 {
             if response.msg.is_some() {
                 return Err(BiliMangaError::CustomError(response.msg.unwrap()));
